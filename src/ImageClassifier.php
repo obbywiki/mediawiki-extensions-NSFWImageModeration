@@ -14,7 +14,8 @@ class ImageClassifier {
 		'NSFWImageModerationAlwaysReject',
 		'NSFWImageModerationTimeout',
 		'NSFWImageModerationNsfwThreshold',
-		'NSFWImageModerationApiKey'
+		'NSFWImageModerationApiKey',
+		'NSFWImageModerationDebug'
 	];
 
 	public function __construct(
@@ -24,12 +25,53 @@ class ImageClassifier {
 		$this->options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 	}
 
-	public function classify( string $file_path ): ClassificationResult {
-		if ( $this->options->get( 'NSFWImageModerationAlwaysReject' ) ) {
-			return new ClassificationResult( true, 'nsfwimagemoderation-upload-rejected', 'nsfw', 1.0 );
+	private ?ClassificationResult $last_result = null;
+
+	public function debug_enabled(): bool {
+		return (bool)$this->options->get( 'NSFWImageModerationDebug' );
+	}
+
+	/**
+	 * Classifier detail for an approved image in the current request, or null when debug is off.
+	 */
+	public function last_approved_debug_summary(): ?string {
+		if ( !$this->debug_enabled() || $this->last_result === null || $this->last_result->rejected ) {
+			return null;
 		}
 
-		return $this->classify_with_service( $file_path );
+		return 'rejected=0 ' . $this->last_result->debug_summary();
+	}
+
+	/**
+	 * @return array{0: string}|array{0: string, 1: string}
+	 */
+	public function rejection_error( string $message_key, string $debug_detail = '' ): array {
+		if ( $this->debug_enabled() ) {
+			return [ $message_key . '-debug', $debug_detail !== '' ? $debug_detail : 'no-details' ];
+		}
+
+		return [ $message_key ];
+	}
+
+	public function classify( string $file_path, string $mime = '', string $filename = '' ): ClassificationResult {
+		if ( $this->options->get( 'NSFWImageModerationAlwaysReject' ) ) {
+			$result = new ClassificationResult(
+				true,
+				'nsfwimagemoderation-upload-rejected',
+				'nsfw',
+				1.0,
+				[],
+				'mode=always-reject'
+			);
+			$this->log_result( $result, $file_path, $mime, $filename );
+
+			return $result;
+		}
+
+		$result = $this->classify_with_service( $file_path );
+		$this->log_result( $result, $file_path, $mime, $filename );
+
+		return $result;
 	}
 
 	/**
@@ -38,7 +80,7 @@ class ImageClassifier {
 	private function classify_with_service( string $file_path ): ClassificationResult {
 		$image_bytes = file_get_contents( $file_path );
 		if ( $image_bytes === false || $image_bytes === '' ) {
-			return $this->unavailable_result();
+			return $this->unavailable_result( 'reason=empty-file' );
 		}
 
 		$url = $this->options->get( 'NSFWImageModerationClassifierUrl' );
@@ -53,27 +95,79 @@ class ImageClassifier {
 		}
 
 		try {
-			$client = $this->http_request_factory->createGuzzleClient( [ 'timeout' => $timeout, 'connect_timeout' => min( 5, $timeout ) ] );
-			$response = $client->post( $url, [ 'headers' => $headers, 'json' => HfImageClassification::request_payload( $image_bytes ) ] );
-			$data = json_decode( (string)$response->getBody(), true );
+			$client = $this->http_request_factory->createGuzzleClient( [
+				'timeout' => $timeout,
+				'connect_timeout' => min( 5, $timeout ),
+			] );
+			$response = $client->post( $url, [
+				'headers' => $headers,
+				'json' => HfImageClassification::request_payload( $image_bytes ),
+			] );
+			$body = (string)$response->getBody();
+			$data = json_decode( $body, true );
 			$result = HfImageClassification::from_response( $data, $threshold );
 
 			if ( $result === null ) {
 				$this->logger()->warning( 'Classifier returned an unexpected payload' );
 
-				return $this->unavailable_result();
+				return $this->unavailable_result(
+					'reason=unexpected-payload status=' . $response->getStatusCode()
+					. ' body=' . $this->truncate( $body )
+				);
 			}
 
-			return $result;
+			return new ClassificationResult(
+				$result->rejected,
+				$result->message_key,
+				$result->label,
+				$result->score,
+				$result->scores,
+				'threshold=' . $threshold
+			);
 		} catch ( Throwable $e ) {
 			$this->logger()->warning( 'Classifier request failed: {message}', [ 'message' => $e->getMessage() ] );
 
-			return $this->unavailable_result();
+			return $this->unavailable_result(
+				'reason=request-failed error=' . $this->truncate( $e->getMessage() )
+			);
 		}
 	}
 
-	private function unavailable_result(): ClassificationResult {
-		return new ClassificationResult( true, 'nsfwimagemoderation-upload-unavailable' );
+	private function unavailable_result( string $detail = '' ): ClassificationResult {
+		return new ClassificationResult(
+			true,
+			'nsfwimagemoderation-upload-unavailable',
+			'',
+			null,
+			[],
+			$detail
+		);
+	}
+
+	private function log_result( ClassificationResult $result, string $file_path, string $mime, string $filename ): void {
+		$this->last_result = $result;
+
+		if ( !$this->debug_enabled() ) {
+			return;
+		}
+
+		$this->logger()->info( 'classified {summary}', [
+			'summary' => implode( ' ', array_filter( [
+				'file=' . ( $filename !== '' ? $filename : basename( $file_path ) ),
+				$mime !== '' ? 'mime=' . $mime : '',
+				'rejected=' . ( $result->rejected ? '1' : '0' ),
+				$result->debug_summary()
+			] ) ),
+		] );
+	}
+
+	private function truncate( string $value ): string {
+		$value = str_replace( [ "\r", "\n" ], ' ', $value );
+		if ( strlen( $value ) <= 300 ) {
+			return $value;
+		}
+
+		return substr( $value, 0, 300 ) . '...';
 	}
 
 	private function logger() {

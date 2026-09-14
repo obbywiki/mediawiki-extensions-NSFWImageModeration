@@ -62,7 +62,8 @@ class HfImageClassification {
 			$rejected,
 			$rejected ? 'nsfwimagemoderation-upload-rejected' : '',
 			$top_label,
-			is_finite( $top_score ) ? $top_score : null
+			is_finite( $top_score ) ? $top_score : null,
+			$scores
 		);
 	}
 
