@@ -1,0 +1,71 @@
+{
+	"manifest_version": 2,
+	"name": "NSFWImageModeration",
+	"descriptionmsg": "nsfwimagemoderation-desc",
+	"author": [
+		"[https://wolfite.dev Wolfite]",
+		"[https://obby.wiki The Obby Wiki]"
+	],
+	"version": "0.1.0",
+	"license-name": "GPL-3.0-or-later",
+	"url": "https://github.com/obbywiki/mediawiki-extensions-NSFWImageModeration",
+
+	"type": "other",
+
+	"requires": {
+		"MediaWiki": ">= 1.46.0",
+		"platform": {
+			"php": ">= 8.3"
+		}
+	},
+
+	"AutoloadNamespaces": {
+		"MediaWiki\\Extension\\NSFWImageModeration\\": "src/"
+	},
+
+	"MessagesDirs": {
+		"NSFWImageModeration": [
+			"i18n"
+		]
+	},
+
+	"HookHandlers": {
+		"main": {
+			"class": "MediaWiki\\Extension\\NSFWImageModeration\\Hooks",
+			"services": [
+				"NSFWImageModeration.ImageClassifier"
+			]
+		}
+	},
+
+	"Hooks": {
+		"UploadVerifyFile": "main"
+	},
+
+	"ServiceWiringFiles": [
+		"src/ServiceWiring.php"
+	],
+
+	"config": {
+		"NSFWImageModerationClassifierUrl": {
+			"value": "http://nsfw_detector:8000/v1/classify",
+			"description": "Hugging Face image-classification endpoint (POST JSON {inputs: base64, parameters: {top_k: 2}})."
+		},
+		"NSFWImageModerationAlwaysReject": {
+			"value": false,
+			"description": "When true, reject every image upload without calling the classifier."
+		},
+		"NSFWImageModerationTimeout": {
+			"value": 30,
+			"description": "Classifier HTTP timeout in seconds."
+		},
+		"NSFWImageModerationNsfwThreshold": {
+			"value": 0.5,
+			"description": "Reject the upload when the Falconsai `nsfw` score is greater than or equal to this value."
+		},
+		"NSFWImageModerationApiKey": {
+			"value": "",
+			"description": "Optional Bearer token sent as Authorization. Leave empty for a local nsfw_detector with no auth."
+		}
+	}
+}

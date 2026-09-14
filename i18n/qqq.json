@@ -1,0 +1,10 @@
+{
+	"@metadata": {
+		"authors": [
+			"Wolfite"
+		]
+	},
+	"nsfwimagemoderation-desc": "{{desc|name=NSFWImageModeration|url=https://github.com/obbywiki/mediawiki-extensions-NSFWImageModeration}}",
+	"nsfwimagemoderation-upload-rejected": "Error shown when an image upload is blocked by the moderation classifier.",
+	"nsfwimagemoderation-upload-unavailable": "Error shown when the moderation classifier cannot be reached and the upload is rejected."
+}

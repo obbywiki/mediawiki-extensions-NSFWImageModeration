@@ -1,0 +1,10 @@
+{
+	"@metadata": {
+		"authors": [
+			"Wolfite"
+		]
+	},
+	"nsfwimagemoderation-desc": "Classifies uploaded images and rejects content that fails moderation.",
+	"nsfwimagemoderation-upload-rejected": "This image was rejected by content moderation.",
+	"nsfwimagemoderation-upload-unavailable": "This image could not be checked by content moderation and was rejected."
+}
