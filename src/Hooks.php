@@ -20,7 +20,8 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 
 	/** @inheritDoc */
 	public function onUploadVerifyFile( $upload, $mime, &$error ) {
-		if ( !str_starts_with( (string)$mime, 'image/' ) ) {
+		$mime = (string)$mime;
+		if ( !ImageClassifier::is_classifiable_mime( $mime ) ) {
 			return;
 		}
 
@@ -37,7 +38,11 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 			return;
 		}
 
-		$result = $this->image_classifier->classify( $file_path, (string)$mime, (string)$upload->getDesiredDestName() );
+		if ( !ImageClassifier::is_readable_raster_image( $file_path ) ) {
+			return;
+		}
+
+		$result = $this->image_classifier->classify( $file_path, $mime, (string)$upload->getDesiredDestName() );
 		if ( $result->rejected ) {
 			$error = $this->image_classifier->rejection_error(
 				$result->message_key,

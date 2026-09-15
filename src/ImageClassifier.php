@@ -20,6 +20,31 @@ class ImageClassifier {
 		'NSFWImageModerationFailClosed'
 	];
 
+	private const CLASSIFIABLE_MIME_TYPES = [
+		'image/bmp',
+		'image/gif',
+		'image/jpeg',
+		'image/jpg',
+		'image/pjpeg',
+		'image/png',
+		'image/tiff',
+		'image/webp',
+		'image/x-bmp',
+		'image/x-ms-bmp',
+		'image/x-png',
+		'image/x-tiff',
+	];
+
+	private const CLASSIFIABLE_IMAGE_TYPES = [
+		IMAGETYPE_BMP,
+		IMAGETYPE_GIF,
+		IMAGETYPE_JPEG,
+		IMAGETYPE_PNG,
+		IMAGETYPE_TIFF_II,
+		IMAGETYPE_TIFF_MM,
+		IMAGETYPE_WEBP,
+	];
+
 	public function __construct(
 		private readonly HttpRequestFactory $http_request_factory,
 		private readonly ServiceOptions $options,
@@ -38,6 +63,10 @@ class ImageClassifier {
 	 */
 	public function last_approved_debug_summary(): ?string {
 		if ( !$this->debug_enabled() || $this->last_result === null || $this->last_result->rejected ) {
+			return null;
+		}
+
+		if ( str_starts_with( $this->last_result->detail, 'skipped=' ) ) {
 			return null;
 		}
 
@@ -70,10 +99,84 @@ class ImageClassifier {
 			return $result;
 		}
 
+		if ( !self::is_classifiable_image( $file_path, $mime ) ) {
+			$result = new ClassificationResult(
+				false,
+				'',
+				'',
+				null,
+				[],
+				'skipped=not-readable-image'
+			);
+			$this->log_result( $result, $file_path, $mime, $filename );
+
+			return $result;
+		}
+
 		$result = $this->classify_with_service( $file_path );
 		$this->log_result( $result, $file_path, $mime, $filename );
 
 		return $result;
+	}
+
+	/**
+	 * True when the upload is a raster image the classifier can decode, false if otherwise. SVG and other `image/*` drawing formats are excluded.
+	 */
+	public static function is_classifiable_image( string $file_path, string $mime = '' ): bool {
+		if ( $file_path === '' || !is_readable( $file_path ) ) {
+			return false;
+		}
+
+		if ( $mime !== '' && !self::is_classifiable_mime( $mime ) ) {
+			return false;
+		}
+
+		return self::is_readable_raster_image( $file_path );
+	}
+
+	/**
+	 * True when MediaWiki reports a raster MIME type the classifier can decode, false if otherwise.
+	 */
+	public static function is_classifiable_mime( string $mime ): bool {
+		return in_array( self::normalize_mime( $mime ), self::CLASSIFIABLE_MIME_TYPES, true );
+	}
+
+	/**
+	 * True when the file magic bytes identify a raster format the classifier can decode, false if otherwise.
+	 */
+	public static function is_readable_raster_image( string $file_path ): bool {
+		$image_type = self::detect_image_type( $file_path );
+
+		return $image_type !== false && in_array( $image_type, self::CLASSIFIABLE_IMAGE_TYPES, true );
+	}
+
+	private static function normalize_mime( string $mime ): string {
+		$mime = strtolower( trim( $mime ) );
+		$semicolon = strpos( $mime, ';' );
+		if ( $semicolon !== false ) {
+			$mime = trim( substr( $mime, 0, $semicolon ) );
+		}
+
+		return $mime;
+	}
+
+	/**
+	 * @return int|false
+	 */
+	private static function detect_image_type( string $file_path ) {
+		if ( function_exists( 'exif_imagetype' ) ) {
+			$type = @exif_imagetype( $file_path );
+			if ( $type !== false ) {
+				return $type;
+			}
+		}
+
+		$image_info = @getimagesize( $file_path );
+		if ( $image_info === false ) {
+			return false;
+		}
+
+		return $image_info[2] ?? false;
 	}
 
 	/**
