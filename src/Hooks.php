@@ -26,7 +26,13 @@ class Hooks implements UploadVerifyFileHook, UploadCompleteHook, BeforePageDispl
 
 		$file_path = $upload->getTempPath();
 		if ( $file_path === '' || !is_readable( $file_path ) ) {
-			$error = $this->image_classifier->rejection_error( 'nsfwimagemoderation-upload-unavailable', 'reason=unreadable-temp-file' );
+			$result = $this->image_classifier->result_for_unavailable( 'reason=unreadable-temp-file' );
+			if ( $result->rejected ) {
+				$error = $this->image_classifier->rejection_error(
+					$result->message_key,
+					$result->debug_summary()
+				);
+			}
 
 			return;
 		}

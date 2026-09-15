@@ -15,7 +15,8 @@ class ImageClassifier {
 		'NSFWImageModerationTimeout',
 		'NSFWImageModerationNsfwThreshold',
 		'NSFWImageModerationApiKey',
-		'NSFWImageModerationDebug'
+		'NSFWImageModerationDebug',
+		'NSFWImageModerationFailClosed'
 	];
 
 	public function __construct(
@@ -133,14 +134,27 @@ class ImageClassifier {
 		}
 	}
 
+	public function result_for_unavailable( string $detail, string $file_path = '', string $mime = '', string $filename = '' ): ClassificationResult {
+		$result = $this->unavailable_result( $detail );
+		$this->log_result( $result, $file_path, $mime, $filename );
+
+		return $result;
+	}
+
 	private function unavailable_result( string $detail = '' ): ClassificationResult {
+		$fail_closed = (bool)$this->options->get( 'NSFWImageModerationFailClosed' );
+		$parts = [ $fail_closed ? 'fail=closed' : 'fail=open' ];
+		if ( $detail !== '' ) {
+			$parts[] = $detail;
+		}
+
 		return new ClassificationResult(
-			true,
-			'nsfwimagemoderation-upload-unavailable',
+			$fail_closed,
+			$fail_closed ? 'nsfwimagemoderation-upload-unavailable' : '',
 			'',
 			null,
 			[],
-			$detail
+			implode( ' ', $parts )
 		);
 	}
 

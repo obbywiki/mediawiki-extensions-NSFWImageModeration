@@ -6,6 +6,8 @@ Automated and local image moderation using the [HF image-classification specific
 
 Ensure `$wgNSFWImageModerationDebug` is disabled in production as it provdes exact classification values that may help with circumvention or bypassing.
 
+`$wgNSFWImageModerationFailClosed` defaults to `true` (reject when the classifier is down or returns a bad response). Set it to `false` to fail open.
+
 SUPPORT WILL NOT BE PROVIDED.
 
 Current issues:

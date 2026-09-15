@@ -73,6 +73,10 @@
 		"NSFWImageModerationDebug": {
 			"value": false,
 			"description": "When true, upload success and rejection UI (and the NSFWImageModeration log group) include classifier scores and failure details."
+		},
+		"NSFWImageModerationFailClosed": {
+			"value": true,
+			"description": "When true, reject image uploads if the classifier is unreachable or returns an invalid response. When false, allow those uploads (fail open)."
 		}
 	}
 }
