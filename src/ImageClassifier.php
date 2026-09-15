@@ -5,6 +5,7 @@ namespace MediaWiki\Extension\NSFWImageModeration;
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Http\HttpRequestFactory;
 use MediaWiki\Logger\LoggerFactory;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 class ImageClassifier {
@@ -184,7 +185,7 @@ class ImageClassifier {
 		return substr( $value, 0, 300 ) . '...';
 	}
 
-	private function logger() {
+	private function logger(): LoggerInterface {
 		return LoggerFactory::getInstance( 'NSFWImageModeration' );
 	}
 

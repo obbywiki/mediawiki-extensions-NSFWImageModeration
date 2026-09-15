@@ -5,7 +5,12 @@ namespace MediaWiki\Extension\NSFWImageModeration;
 class ClassificationResult {
 
 	/**
-	 * @param list<array{label: string, score: float}> $scores
+	 * @param bool $rejected
+	 * @param string $message_key
+	 * @param string $label
+	 * @param float|null $score
+	 * @param array<array{label: string, score: float}> $scores
+	 * @param string $detail
 	 */
 	public function __construct(
 		public readonly bool $rejected,
@@ -30,7 +35,7 @@ class ClassificationResult {
 		}
 		if ( $this->scores !== [] ) {
 			$score_parts = [];
-			
+
 			foreach ( $this->scores as $entry ) {
 				$score_parts[] = $entry['label'] . '=' . self::format_score( $entry['score'] );
 			}
